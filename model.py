@@ -48,33 +48,36 @@ class SASRec(torch.nn.Module):
         self.forward_layernorms = torch.nn.ModuleList()
         self.forward_layers = torch.nn.ModuleList()
 
-        self.last_layernorm = torch.nn.LayerNorm(args.hidden_units, eps=1e-8)
+        self.last_layernorm = torch.nn.LayerNorm(args.vec_size, eps=1e-8)
 
         for _ in range(args.num_blocks):
-            new_attn_layernorm = torch.nn.LayerNorm(args.hidden_units, eps=1e-8)
+            new_attn_layernorm = torch.nn.LayerNorm(args.vec_size, eps=1e-8)
             self.attention_layernorms.append(new_attn_layernorm)
 
             new_attn_layer = torch.nn.MultiheadAttention(
-                args.hidden_units, args.num_heads, args.dropout_rate
+                args.vec_size, args.num_heads, args.dropout_rate
             )
             self.attention_layers.append(new_attn_layer)
 
-            new_fwd_layernorm = torch.nn.LayerNorm(args.hidden_units, eps=1e-8)
+            new_fwd_layernorm = torch.nn.LayerNorm(args.vec_size, eps=1e-8)
             self.forward_layernorms.append(new_fwd_layernorm)
 
-            new_fwd_layer = PointWiseFeedForward(args.hidden_units, args.dropout_rate)
+            new_fwd_layer = PointWiseFeedForward(args.vec_size, args.dropout_rate)
             self.forward_layers.append(new_fwd_layer)
 
             # self.pos_sigmoid = torch.nn.Sigmoid()
             # self.neg_sigmoid = torch.nn.Sigmoid()
 
-    def log2feats(self, log_seqs):
+    def log2feats(self, log_seqs, itm_seqs):
         seqs = self.item_emb(torch.LongTensor(log_seqs).to(self.dev))
         seqs *= self.item_emb.embedding_dim ** 0.5
         positions = np.tile(np.array(range(log_seqs.shape[1])), [log_seqs.shape[0], 1])
 
         seqs += self.pos_emb(torch.LongTensor(positions).to(self.dev))
         seqs = self.emb_dropout(seqs)
+
+        itms = torch.LongTensor(itm_seqs).to(self.dev)
+        seqs = torch.cat([seqs, itms], 2)
 
         timeline_mask = torch.BoolTensor(log_seqs == 0).to(self.dev)
         seqs *= ~timeline_mask.unsqueeze(-1)  # broadcast in last dim
@@ -103,11 +106,27 @@ class SASRec(torch.nn.Module):
 
         return log_feats
 
-    def forward(self, user_ids, log_seqs, pos_seqs, neg_seqs):  # for training
-        log_feats = self.log2feats(log_seqs)  # user_ids hasn't been used yet
+    def forward(
+        self,
+        user_ids,
+        log_seqs,
+        log_itm_seqs,
+        pos_seqs,
+        pos_itm_seqs,
+        neg_seqs,
+        neg_itm_seqs,
+    ):  # for training
+        log_feats = self.log2feats(
+            log_seqs, log_itm_seqs
+        )  # user_ids hasn't been used yet
 
         pos_embs = self.item_emb(torch.LongTensor(pos_seqs).to(self.dev))
+        pos_itms = torch.LongTensor(pos_itm_seqs).to(self.dev)
+        pos_embs = torch.cat([pos_embs, pos_itms], 2)
+
         neg_embs = self.item_emb(torch.LongTensor(neg_seqs).to(self.dev))
+        neg_itms = torch.LongTensor(neg_itm_seqs).to(self.dev)
+        neg_embs = torch.cat([neg_embs, neg_itms], 2)
 
         pos_logits = (log_feats * pos_embs).sum(dim=-1)
         neg_logits = (log_feats * neg_embs).sum(dim=-1)
@@ -117,14 +136,19 @@ class SASRec(torch.nn.Module):
 
         return pos_logits, neg_logits  # pos_pred, neg_pred
 
-    def predict(self, user_ids, log_seqs, item_indices):  # for inference
-        log_feats = self.log2feats(log_seqs)  # user_ids hasn't been used yet
+    def predict(
+        self, user_ids, log_seqs, log_itm_seqs, item_indices, item_itm_indices
+    ):  # for inference
+        log_feats = self.log2feats(
+            log_seqs, log_itm_seqs
+        )  # user_ids hasn't been used yet
 
         final_feat = log_feats[:, -1, :]  # only use last QKV classifier, a waste
 
-        item_embs = self.item_emb(
-            torch.LongTensor(item_indices).to(self.dev)
-        )  # (U, I, C)
+        # (U, I, C)
+        item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))
+        item_itms = torch.LongTensor(item_itm_indices).to(self.dev)
+        item_embs = torch.cat([item_embs, item_itms], 1)
 
         logits = item_embs.matmul(final_feat.unsqueeze(-1)).squeeze(-1)
 
