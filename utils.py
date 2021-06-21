@@ -1,4 +1,5 @@
 import sys
+import os
 import copy
 import torch
 import random
@@ -106,7 +107,7 @@ def data_partition(fname):
     user_test = {}
 
     # assume user/item index starting from 1
-    with open(f"data/{fname}/{fname}.txt", "r") as f:
+    with open(os.path.join("data", fname, f"{fname}.txt"), "r") as f:
         for line in f:
             u, i = line.rstrip().split(" ")
             u = int(u)

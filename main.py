@@ -65,7 +65,7 @@ def run():
         itemnum,
         batch_size=args.batch_size,
         maxlen=args.maxlen,
-        n_workers=3,
+        n_workers=8,
     )
 
     # no ReLU activation in original SASRec implementation?
@@ -112,11 +112,15 @@ def run():
 
     T = 0.0
     t0 = time.time()
+    epoch_times = []
+    losses = []
 
     for epoch in range(epoch_start_idx, args.num_epochs + 1):
         if args.inference_only:
             break  # just to decrease identition
         # tqdm(range(num_batch), total=num_batch, ncols=70, leave=False, unit='b'):
+        epoch_losses = []
+        t_start = time.time()
         for step in range(num_batch):
             u, seq, pos, neg = sampler.next_batch()  # tuples to ndarray
             u, seq, pos, neg = np.array(u), np.array(seq), np.array(pos), np.array(neg)
@@ -136,9 +140,14 @@ def run():
                 loss += args.l2_emb * torch.norm(param)
             loss.backward()
             adam_optimizer.step()
-
+            epoch_losses.append(loss.item())
             # expected 0.4~0.6 after init few epochs
-            print(f"loss in epoch {epoch} iteration {step}: {loss.item()}")
+            # print(f"loss in epoch {epoch} iteration {step}: {loss.item()}")
+        epoc_time = time.time() - t_start
+        epoch_times.append(epoc_time)
+        losses.append((np.array(epoch_losses)).mean())
+        print(f"epoch #{epoch} done in: {epoc_time} sec")
+        print(f"avg loss:{(np.array(epoch_losses)).mean()}")
 
         if epoch % 20 == 0:
             model.eval()
@@ -172,6 +181,11 @@ def run():
 
     f.close()
     sampler.close()
+    import pickle
+    with open('Steam_model_1/losses.pkl', 'wb') as f:
+        pickle.dump(losses, f)
+    with open('Steam_model_1/epoch_times.pkl', 'wb') as f:
+        pickle.dump(epoch_times, f)
     print("Done")
 
 
