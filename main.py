@@ -21,6 +21,7 @@ parser.add_argument("--batch_size", default=128, type=int)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--maxlen", default=50, type=int)
 parser.add_argument("--hidden_units", default=50, type=int)
+parser.add_argument("--vec_size", default=115, type=int)
 parser.add_argument("--num_blocks", default=2, type=int)
 parser.add_argument("--num_epochs", default=201, type=int)
 parser.add_argument("--num_heads", default=1, type=int)
@@ -47,7 +48,7 @@ f.close()
 
 def run():
     dataset = data_partition(args.dataset)
-    [user_train, user_valid, user_test, usernum, itemnum] = dataset
+    [user_train, user_valid, user_test, items_info, usernum, itemnum] = dataset
 
     # tail? + ((len(user_train) % args.batch_size) != 0)
     num_batch = len(user_train) // args.batch_size
@@ -61,6 +62,7 @@ def run():
 
     sampler = WarpSampler(
         user_train,
+        items_info,
         usernum,
         itemnum,
         batch_size=args.batch_size,
@@ -118,10 +120,26 @@ def run():
             break  # just to decrease identition
         # tqdm(range(num_batch), total=num_batch, ncols=70, leave=False, unit='b'):
         for step in range(num_batch):
-            u, seq, pos, neg = sampler.next_batch()  # tuples to ndarray
-            u, seq, pos, neg = np.array(u), np.array(seq), np.array(pos), np.array(neg)
+            (
+                u,
+                seq,
+                seq_itm,
+                pos,
+                pos_itm,
+                neg,
+                neg_itm,
+            ) = sampler.next_batch()  # tuples to ndarray
+            u, seq, seq_itm, pos, pos_itm, neg, neg_itm = (
+                np.array(u),
+                np.array(seq),
+                np.array(seq_itm),
+                np.array(pos),
+                np.array(pos_itm),
+                np.array(neg),
+                np.array(neg_itm),
+            )
 
-            pos_logits, neg_logits = model(u, seq, pos, neg)
+            pos_logits, neg_logits = model(u, seq, seq_itm, pos, pos_itm, neg, neg_itm)
 
             pos_labels = torch.ones(pos_logits.shape, device=args.device)
             neg_labels = torch.zeros(neg_logits.shape, device=args.device)
