@@ -1,0 +1,5 @@
+black
+pylama
+# tensorflow
+tqdm
+pandas
