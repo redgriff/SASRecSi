@@ -104,7 +104,6 @@ celerybeat.pid
 # Environments
 .env
 .venv
-.venv_sas_rec
 env/
 venv/
 ENV/
@@ -131,5 +130,8 @@ dmypy.json
 
 #vscode
 .vscode
+.venv_sas_rec
 workspace.code-workspace
 /models
+data/Steam/reviews_Steam.json.gz
+data/Steam/steam_new.json
