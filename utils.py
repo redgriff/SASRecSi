@@ -43,13 +43,13 @@ def sample_function(
         ts = set(users_seqs[user])
         for i in reversed(users_seqs[user][:-1]):
             seq[idx] = i
-            seq_itm[idx] = items_info.iloc[i].values
+            seq_itm[idx] = items_info.loc[i].values
             pos[idx] = nxt
-            pos_itm[idx] = items_info.iloc[nxt].values
+            pos_itm[idx] = items_info.loc[nxt].values
             if nxt != 0:
                 tmp = random_neq(1, itemnum + 1, ts)
                 neg[idx] = tmp
-                neg_itm[idx] = items_info.iloc[tmp].values
+                neg_itm[idx] = items_info.loc[tmp].values
             nxt = i
             neg_itm[idx] = i
             idx -= 1
@@ -168,11 +168,11 @@ def evaluate(model, dataset, args):
         seq_itm = np.zeros([args.maxlen, len(items_info.columns)])
         idx = args.maxlen - 1
         seq[idx] = valid[u][0]
-        seq_itm[idx] = items_info.iloc[valid[u][0]].values
+        seq_itm[idx] = items_info.loc[valid[u][0]].values
         idx -= 1
         for i in reversed(train[u]):
             seq[idx] = i
-            seq_itm[idx] = items_info.iloc[i].values
+            seq_itm[idx] = items_info.loc[i].values
             idx -= 1
             if idx == -1:
                 break
@@ -180,13 +180,13 @@ def evaluate(model, dataset, args):
         rated = set(train[u])
         rated.add(0)
         item_idx = [test[u][0]]
-        item_idx_itm = [items_info.iloc[test[u][0]].values]
+        item_idx_itm = [items_info.loc[test[u][0]].values]
         for _ in range(100):
             t = np.random.randint(1, itemnum + 1)
             while t in rated:
                 t = np.random.randint(1, itemnum + 1)
             item_idx.append(t)
-            item_idx_itm.append(items_info.iloc[t].values)
+            item_idx_itm.append(items_info.loc[t].values)
 
         predictions = -model.predict(
             *[np.array(l) for l in [[u], [seq], [seq_itm], item_idx, item_idx_itm]]
@@ -227,7 +227,7 @@ def evaluate_valid(model, dataset, args):
         idx = args.maxlen - 1
         for i in reversed(train[u]):
             seq[idx] = i
-            seq_itm[idx] = items_info.iloc[i].values
+            seq_itm[idx] = items_info.loc[i].values
             idx -= 1
             if idx == -1:
                 break
@@ -235,13 +235,13 @@ def evaluate_valid(model, dataset, args):
         rated = set(train[u])
         rated.add(0)
         item_idx = [valid[u][0]]
-        item_idx_itm = [items_info.iloc[valid[u][0]].values]
+        item_idx_itm = [items_info.loc[valid[u][0]].values]
         for _ in range(100):
             t = np.random.randint(1, itemnum + 1)
             while t in rated:
                 t = np.random.randint(1, itemnum + 1)
             item_idx.append(t)
-            item_idx_itm.append(items_info.iloc[t].values)
+            item_idx_itm.append(items_info.loc[t].values)
 
         predictions = -model.predict(
             *[np.array(l) for l in [[u], [seq], [seq_itm], item_idx, item_idx_itm]]
