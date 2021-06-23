@@ -118,7 +118,7 @@ def data_partition(fname):
     user_test = {}
 
     # assume user/item index starting from 1
-    with open(f"data/{fname}/users_seqs.txt", "r") as f:
+    with open(f"data/{fname}/reviews_Steam.txt", "r") as f:
         for line in f:
             u, i = line.rstrip().split(" ")
             u = int(u)
