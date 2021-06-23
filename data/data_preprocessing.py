@@ -1,4 +1,5 @@
 import os
+import pickle as pkl
 import gzip
 from collections import defaultdict
 from datetime import datetime
@@ -16,9 +17,8 @@ countP = defaultdict(lambda: 0)
 line = 0
 
 dataset_name = "Steam"
-txt_file_path = os.path.join(ROOT_DIR, f"reviews_{dataset_name}.txt")
-json_file_path = os.path.join(ROOT_DIR, f"reviews_{dataset_name}.json.gz")
 
+json_file_path = os.path.join(ROOT_DIR, f"reviews_{dataset_name}.json.gz")
 with gzip.open(json_file_path, "r") as g:
     line = 0
     for l in parse(g):
@@ -36,7 +36,7 @@ usermap = dict()
 usernum = 0
 itemmap = dict()
 itemnum = 0
-User = dict()
+users_seqs = dict()
 with gzip.open(json_file_path, "r") as g:
     line = 0
     for l in parse(g):
@@ -56,23 +56,32 @@ with gzip.open(json_file_path, "r") as g:
             usernum += 1
             userid = usernum
             usermap[username] = userid
-            User[userid] = []
+            users_seqs[userid] = []
+
         if product_id in itemmap:
             itemid = itemmap[product_id]
         else:
             itemnum += 1
-            itemid = product_id
+            itemid = itemnum
             itemmap[product_id] = itemid
-        User[userid].append([time, itemid])
+
+        users_seqs[userid].append([time, itemid])
 # sort reviews in User according to time
 
-for userid in User.keys():
-    User[userid].sort(key=lambda x: x[0])
+for userid in users_seqs.keys():
+    users_seqs[userid].sort(key=lambda x: x[0])
 
 print(usernum, itemnum)
 
+with open(os.path.join(ROOT_DIR, "usermap.pkl"), "wb") as handle:
+    pkl.dump(usermap, handle, protocol=pkl.HIGHEST_PROTOCOL)
+
+with open(os.path.join(ROOT_DIR, "itemmap.pkl"), "wb") as handle:
+    pkl.dump(itemmap, handle, protocol=pkl.HIGHEST_PROTOCOL)
+
+txt_file_path = os.path.join(ROOT_DIR, f"reviews_{dataset_name}.txt")
 f = open(txt_file_path, "w")
-for user in User.keys():
-    for i in User[user]:
+for user in users_seqs.keys():
+    for i in users_seqs[user]:
         f.write(f"{user} {i[1]}\n")
 f.close()

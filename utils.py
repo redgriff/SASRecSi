@@ -18,11 +18,6 @@ def get_legnth_dict_items(dictionary):
     first_key = list(dictionary.keys())[0]
     return len(dictionary[first_key])
 
-def return_items_from_items_dict(key, items_dict):
-    if key in items_dict:
-        return items_dict[key]
-    else:
-        return
 
 def sample_function(
     users_seqs,
@@ -128,7 +123,7 @@ def data_partition(fname):
     user_test = {}
 
     # assume user/item index starting from 1
-    with open(f"data/{fname}/users_seqs.txt", "r") as f:
+    with open(f"data/{fname}/reviews_Steam.txt", "r") as f:
         for line in f:
             u, i = line.rstrip().split(" ")
             u = int(u)
