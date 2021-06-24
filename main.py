@@ -67,7 +67,7 @@ def run():
         itemnum,
         batch_size=args.batch_size,
         maxlen=args.maxlen,
-        n_workers=8,
+        n_workers=4,
     )
 
     # no ReLU activation in original SASRec implementation?
@@ -180,6 +180,7 @@ def run():
             )
 
             f.write(f"at time global time: {T} 20 epochs took: {t1}, validation results: {str(t_valid)} , test results:{str(t_test)} \n")
+
             f.flush()
             t0 = time.time()
             model.train()
