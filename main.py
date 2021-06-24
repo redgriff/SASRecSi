@@ -67,7 +67,7 @@ def run():
         itemnum,
         batch_size=args.batch_size,
         maxlen=args.maxlen,
-        n_workers=1,
+        n_workers=8,
     )
 
     # no ReLU activation in original SASRec implementation?
@@ -123,7 +123,7 @@ def run():
         # tqdm(range(num_batch), total=num_batch, ncols=70, leave=False, unit='b'):
         epoch_losses = []
         t_start = time.time()
-        for step in range(1):
+        for step in range(num_batch):
             (
                 u,
                 seq,
@@ -167,7 +167,7 @@ def run():
         print(f"epoch #{epoch} done in: {epoc_time} sec")
         print(f"avg loss:{(np.array(epoch_losses)).mean()}")
 
-        if epoch % 10 == 0:
+        if epoch % 20 == 0:
             model.eval()
             t1 = time.time() - t0
             T += t1
@@ -179,7 +179,7 @@ def run():
                 % (epoch, T, t_valid[0], t_valid[1], t_test[0], t_test[1])
             )
 
-            f.write(str(t_valid) + " " + str(t_test) + "\n")
+            f.write(f"at time global time: {T} 20 epochs took: {t1}, validation results: {str(t_valid)} , test results:{str(t_test)} \n")
             f.flush()
             t0 = time.time()
             model.train()

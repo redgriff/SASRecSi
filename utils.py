@@ -148,9 +148,9 @@ def data_partition(fname):
     items_info = pd.read_csv(f"data/{fname}/items_info.csv")
     items_info["id"] = items_info["id"].astype(int)
     items_info = items_info.set_index("id")
+    items_info = {idx: row.values for idx, row in items_info.iterrows()}
 
-    items_info = items_info.to_dict('index')
-
+    # items_info = items_info.to_dict('index')
 
     return [user_train, user_valid, user_test, items_info, usernum, itemnum]
 
@@ -174,7 +174,7 @@ def evaluate(model, dataset, args):
             continue
 
         seq = np.zeros([args.maxlen], dtype=np.int32)
-        seq_itm = np.zeros([args.maxlen, len(items_info.columns)])
+        seq_itm = np.zeros([args.maxlen, get_legnth_dict_items(items_info)])
         idx = args.maxlen - 1
         seq[idx] = valid[u][0]
         seq_itm[idx] = items_info[valid[u][0]]
