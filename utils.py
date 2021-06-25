@@ -140,7 +140,7 @@ def data_partition(fname):
                 user_test[user] = []
                 user_test[user].append(User[user][-1])
 
-    items_info = pd.read_csv(f"data/{fname}/items_info.csv")
+    items_info = pd.read_csv(f"data/{fname}/items_info_pca.csv")
     items_info["id"] = items_info["id"].astype(int)
     items_info = items_info.set_index("id")
     return [user_train, user_valid, user_test, items_info, usernum, itemnum]

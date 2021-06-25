@@ -21,7 +21,6 @@ parser.add_argument("--batch_size", default=128, type=int)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--maxlen", default=50, type=int)
 parser.add_argument("--hidden_units", default=50, type=int)
-parser.add_argument("--vec_size", default=115, type=int)
 parser.add_argument("--num_blocks", default=2, type=int)
 parser.add_argument("--num_epochs", default=201, type=int)
 parser.add_argument("--num_heads", default=1, type=int)
@@ -147,6 +146,7 @@ def run():
             # print("\neye ball check raw_logits:"); print(pos_logits); print(neg_logits) # check pos_logits > 0, neg_logits < 0
             adam_optimizer.zero_grad()
             indices = np.where(pos != 0)
+
             loss = bce_criterion(pos_logits[indices], pos_labels[indices])
             loss += bce_criterion(neg_logits[indices], neg_labels[indices])
 
