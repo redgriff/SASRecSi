@@ -48,21 +48,21 @@ class SASRec(torch.nn.Module):
         self.forward_layernorms = torch.nn.ModuleList()
         self.forward_layers = torch.nn.ModuleList()
 
-        self.last_layernorm = torch.nn.LayerNorm(args.vec_size, eps=1e-8)
+        self.last_layernorm = torch.nn.LayerNorm(args.hidden_units, eps=1e-8)
 
         for _ in range(args.num_blocks):
-            new_attn_layernorm = torch.nn.LayerNorm(args.vec_size, eps=1e-8)
+            new_attn_layernorm = torch.nn.LayerNorm(args.hidden_units, eps=1e-8)
             self.attention_layernorms.append(new_attn_layernorm)
 
             new_attn_layer = torch.nn.MultiheadAttention(
-                args.vec_size, args.num_heads, args.dropout_rate
+                args.hidden_units, args.num_heads, args.dropout_rate
             )
             self.attention_layers.append(new_attn_layer)
 
-            new_fwd_layernorm = torch.nn.LayerNorm(args.vec_size, eps=1e-8)
+            new_fwd_layernorm = torch.nn.LayerNorm(args.hidden_units, eps=1e-8)
             self.forward_layernorms.append(new_fwd_layernorm)
 
-            new_fwd_layer = PointWiseFeedForward(args.vec_size, args.dropout_rate)
+            new_fwd_layer = PointWiseFeedForward(args.hidden_units, args.dropout_rate)
             self.forward_layers.append(new_fwd_layer)
 
             # self.pos_sigmoid = torch.nn.Sigmoid()
@@ -71,13 +71,14 @@ class SASRec(torch.nn.Module):
     def log2feats(self, log_seqs, itm_seqs):
         seqs = self.item_emb(torch.LongTensor(log_seqs).to(self.dev))
         seqs *= self.item_emb.embedding_dim ** 0.5
-        positions = np.tile(np.array(range(log_seqs.shape[1])), [log_seqs.shape[0], 1])
 
+        positions = np.tile(np.array(range(log_seqs.shape[1])), [log_seqs.shape[0], 1])
         seqs += self.pos_emb(torch.LongTensor(positions).to(self.dev))
-        seqs = self.emb_dropout(seqs)
 
         itms = torch.LongTensor(itm_seqs).to(self.dev)
-        seqs = torch.cat([seqs, itms], 2)
+        seqs += itms
+
+        seqs = self.emb_dropout(seqs)
 
         timeline_mask = torch.BoolTensor(log_seqs == 0).to(self.dev)
         seqs *= ~timeline_mask.unsqueeze(-1)  # broadcast in last dim
@@ -122,11 +123,11 @@ class SASRec(torch.nn.Module):
 
         pos_embs = self.item_emb(torch.LongTensor(pos_seqs).to(self.dev))
         pos_itms = torch.LongTensor(pos_itm_seqs).to(self.dev)
-        pos_embs = torch.cat([pos_embs, pos_itms], 2)
+        pos_embs += pos_itms
 
         neg_embs = self.item_emb(torch.LongTensor(neg_seqs).to(self.dev))
         neg_itms = torch.LongTensor(neg_itm_seqs).to(self.dev)
-        neg_embs = torch.cat([neg_embs, neg_itms], 2)
+        neg_embs += neg_itms
 
         pos_logits = (log_feats * pos_embs).sum(dim=-1)
         neg_logits = (log_feats * neg_embs).sum(dim=-1)
@@ -148,7 +149,7 @@ class SASRec(torch.nn.Module):
         # (U, I, C)
         item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))
         item_itms = torch.LongTensor(item_itm_indices).to(self.dev)
-        item_embs = torch.cat([item_embs, item_itms], 1)
+        item_embs += item_itms
 
         logits = item_embs.matmul(final_feat.unsqueeze(-1)).squeeze(-1)
 

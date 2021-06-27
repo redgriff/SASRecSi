@@ -12,4 +12,3 @@ num_epochs,201
 num_heads,1
 state_dict_path,None
 train_dir,default
-vec_size,115
