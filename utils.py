@@ -56,7 +56,7 @@ def sample_function(
                 neg[idx] = tmp
                 neg_itm[idx] = items_info[tmp]
             nxt = i
-            neg_itm[idx] = i
+            # neg_itm[idx] = i
             idx -= 1
             if idx == -1:
                 break
