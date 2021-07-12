@@ -67,7 +67,7 @@ def run():
         itemnum,
         batch_size=args.batch_size,
         maxlen=args.maxlen,
-        n_workers=3,
+        n_workers=4,
     )
 
     # no ReLU activation in original SASRec implementation?
