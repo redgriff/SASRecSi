@@ -133,5 +133,6 @@ dmypy.json
 .venv_sas_rec
 workspace.code-workspace
 /models
+/results
 data/Steam/reviews_Steam.json.gz
 data/Steam/steam_new.json
