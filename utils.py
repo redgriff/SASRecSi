@@ -114,7 +114,7 @@ class WarpSampler(object):
 
 
 # train/val/test data generation
-def data_partition(fname):
+def data_partition(fname, items_info_fname):
     usernum = 0
     itemnum = 0
     User = defaultdict(list)
@@ -123,7 +123,7 @@ def data_partition(fname):
     user_test = {}
 
     # assume user/item index starting from 1
-    with open(f"data/{fname}/reviews_Steam.txt", "r") as f:
+    with open(f"data/{fname}/reviews_{fname}.txt", "r") as f:
         for line in f:
             u, i = line.rstrip().split(" ")
             u = int(u)
@@ -145,7 +145,7 @@ def data_partition(fname):
                 user_test[user] = []
                 user_test[user].append(User[user][-1])
 
-    items_info = pd.read_csv(f"data/{fname}/items_info_pca.csv")
+    items_info = pd.read_csv(f"data/{fname}/{items_info_fname}")
 
     items_info["id"] = items_info["id"].astype(int)
     items_info = items_info.set_index("id")

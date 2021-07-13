@@ -4,7 +4,8 @@ import torch
 import argparse
 
 import numpy as np
-from model import SASRec
+from our_model import SASRecSi
+from org_model import SASRec
 from utils import data_partition, WarpSampler, evaluate, evaluate_valid
 
 
@@ -21,6 +22,7 @@ parser.add_argument("--batch_size", default=128, type=int)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--maxlen", default=50, type=int)
 parser.add_argument("--hidden_units", default=50, type=int)
+parser.add_argument("--vec_size", default=74, type=int)
 parser.add_argument("--num_blocks", default=2, type=int)
 parser.add_argument("--num_epochs", default=201, type=int)
 parser.add_argument("--num_heads", default=1, type=int)
@@ -29,6 +31,8 @@ parser.add_argument("--l2_emb", default=0.0, type=float)
 parser.add_argument("--device", default="cpu", type=str)
 parser.add_argument("--inference_only", default=False, type=str2bool)
 parser.add_argument("--state_dict_path", default=None, type=str)
+parser.add_argument("--items_info_fname", default="items_info.csv", type=str)
+parser.add_argument("--model", default="SASRec", type=str)
 
 args = parser.parse_args()
 if not os.path.isdir(args.dataset + "_" + args.train_dir):
@@ -44,9 +48,13 @@ with open(os.path.join(args.dataset + "_" + args.train_dir, "args.txt"), "w") as
     )
 f.close()
 
+models = {
+    "SASRec": SASRec,
+    "SASRecSi": SASRecSi
+}
 
 def run():
-    dataset = data_partition(args.dataset)
+    dataset = data_partition(args.dataset, args.items_info_fname)
     [user_train, user_valid, user_test, items_info, usernum, itemnum] = dataset
 
     # tail? + ((len(user_train) % args.batch_size) != 0)
@@ -70,7 +78,7 @@ def run():
     )
 
     # no ReLU activation in original SASRec implementation?
-    model = SASRec(usernum, itemnum, args).to(args.device)
+    model = models[args.model](usernum, itemnum, args).to(args.device)
 
     for name, param in model.named_parameters():
         try:
@@ -167,7 +175,7 @@ def run():
         print(f"epoch #{epoch} done in: {epoc_time} sec")
         print(f"avg loss:{(np.array(epoch_losses)).mean()}")
 
-        if epoch % 20 == 0:
+        if epoch % 10 == 0 or epoch < 10:
             model.eval()
             t1 = time.time() - t0
             T += t1
@@ -179,7 +187,7 @@ def run():
                 % (epoch, T, t_valid[0], t_valid[1], t_test[0], t_test[1])
             )
 
-            f.write(f"at time global time: {T} 20 epochs took: {t1}, validation results: {str(t_valid)} , test results:{str(t_test)} \n")
+            f.write(f"at time global time: {T} {epoch} epochs took: {t1}, validation results: {str(t_valid)} , test results:{str(t_test)} \n")
 
             f.flush()
             t0 = time.time()
