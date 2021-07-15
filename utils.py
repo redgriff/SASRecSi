@@ -3,6 +3,7 @@ import copy
 import torch
 import random
 import numpy as np
+import pandas as pd
 from collections import defaultdict
 from multiprocessing import Process, Queue
 
@@ -13,9 +14,14 @@ def random_neq(l, r, s):
         t = np.random.randint(l, r)
     return t
 
+def get_legnth_dict_items(dictionary):
+    first_key = list(dictionary.keys())[0]
+    return len(dictionary[first_key])
+
 
 def sample_function(
-    user_train,
+    users_seqs,
+    items_info,
     usernum,
     itemnum,
     batch_size,
@@ -26,27 +32,36 @@ def sample_function(
     def sample():
 
         user = np.random.randint(1, usernum + 1)
-        while len(user_train[user]) <= 1:
+        while len(users_seqs[user]) <= 1:
             user = np.random.randint(1, usernum + 1)
 
         seq = np.zeros([maxlen], dtype=np.int32)
+
+        seq_itm = np.zeros([maxlen, get_legnth_dict_items(items_info)])
         pos = np.zeros([maxlen], dtype=np.int32)
+        pos_itm = np.zeros([maxlen, get_legnth_dict_items(items_info)])
         neg = np.zeros([maxlen], dtype=np.int32)
-        nxt = user_train[user][-1]
+        neg_itm = np.zeros([maxlen, get_legnth_dict_items(items_info)])
+        nxt = users_seqs[user][-1]
         idx = maxlen - 1
 
-        ts = set(user_train[user])
-        for i in reversed(user_train[user][:-1]):
+        ts = set(users_seqs[user])
+        for i in reversed(users_seqs[user][:-1]):
             seq[idx] = i
+            seq_itm[idx] = items_info[i]
             pos[idx] = nxt
+            pos_itm[idx] = items_info[nxt]
             if nxt != 0:
-                neg[idx] = random_neq(1, itemnum + 1, ts)
+                tmp = random_neq(1, itemnum + 1, ts)
+                neg[idx] = tmp
+                neg_itm[idx] = items_info[tmp]
             nxt = i
+            # neg_itm[idx] = i
             idx -= 1
             if idx == -1:
                 break
 
-        return (user, seq, pos, neg)
+        return (user, seq, seq_itm, pos, pos_itm, neg, neg_itm)
 
     np.random.seed(SEED)
     while True:
@@ -61,6 +76,7 @@ class WarpSampler(object):
     def __init__(
         self,
         users_seqs,
+        items_info,
         usernum,
         itemnum,
         batch_size=64,
@@ -75,6 +91,7 @@ class WarpSampler(object):
                     target=sample_function,
                     args=(
                         users_seqs,
+                        items_info,
                         usernum,
                         itemnum,
                         batch_size,
@@ -97,7 +114,7 @@ class WarpSampler(object):
 
 
 # train/val/test data generation
-def data_partition(fname):
+def data_partition(fname, items_info_fname):
     usernum = 0
     itemnum = 0
     User = defaultdict(list)
@@ -106,7 +123,7 @@ def data_partition(fname):
     user_test = {}
 
     # assume user/item index starting from 1
-    with open(f"data/{fname}/{fname}.txt", "r") as f:
+    with open(f"data/{fname}/reviews_{fname}.txt", "r") as f:
         for line in f:
             u, i = line.rstrip().split(" ")
             u = int(u)
@@ -128,13 +145,21 @@ def data_partition(fname):
                 user_test[user] = []
                 user_test[user].append(User[user][-1])
 
-    return [user_train, user_valid, user_test, usernum, itemnum]
+    items_info = pd.read_csv(f"data/{fname}/{items_info_fname}")
+
+    items_info["id"] = items_info["id"].astype(int)
+    items_info = items_info.set_index("id")
+    items_info = {idx: row.values for idx, row in items_info.iterrows()}
+
+    # items_info = items_info.to_dict('index')
+
+    return [user_train, user_valid, user_test, items_info, usernum, itemnum]
 
 
 # TODO: merge evaluate functions for test and val set
 # evaluate on test set
 def evaluate(model, dataset, args):
-    [train, valid, test, usernum, itemnum] = copy.deepcopy(dataset)
+    [train, valid, test, items_info, usernum, itemnum] = copy.deepcopy(dataset)
 
     NDCG = 0.0
     HT = 0.0
@@ -150,24 +175,32 @@ def evaluate(model, dataset, args):
             continue
 
         seq = np.zeros([args.maxlen], dtype=np.int32)
+        seq_itm = np.zeros([args.maxlen, get_legnth_dict_items(items_info)])
         idx = args.maxlen - 1
         seq[idx] = valid[u][0]
+        seq_itm[idx] = items_info[valid[u][0]]
         idx -= 1
         for i in reversed(train[u]):
             seq[idx] = i
+            seq_itm[idx] = items_info[i]
             idx -= 1
             if idx == -1:
                 break
+
         rated = set(train[u])
         rated.add(0)
         item_idx = [test[u][0]]
+        item_idx_itm = [items_info[test[u][0]]]
         for _ in range(100):
             t = np.random.randint(1, itemnum + 1)
             while t in rated:
                 t = np.random.randint(1, itemnum + 1)
             item_idx.append(t)
+            item_idx_itm.append(items_info[t])
 
-        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]])
+        predictions = -model.predict(
+            *[np.array(l) for l in [[u], [seq], [seq_itm], item_idx, item_idx_itm]]
+        )
         predictions = predictions[0]  # - for 1st argsort DESC
 
         rank = predictions.argsort().argsort()[0].item()
@@ -186,7 +219,7 @@ def evaluate(model, dataset, args):
 
 # evaluate on val set
 def evaluate_valid(model, dataset, args):
-    [train, valid, test, usernum, itemnum] = copy.deepcopy(dataset)
+    [train, valid, test, items_info, usernum, itemnum] = copy.deepcopy(dataset)
 
     NDCG = 0.0
     valid_user = 0.0
@@ -200,9 +233,11 @@ def evaluate_valid(model, dataset, args):
             continue
 
         seq = np.zeros([args.maxlen], dtype=np.int32)
+        seq_itm = np.zeros([args.maxlen, get_legnth_dict_items(items_info)])
         idx = args.maxlen - 1
         for i in reversed(train[u]):
             seq[idx] = i
+            seq_itm[idx] = items_info[i]
             idx -= 1
             if idx == -1:
                 break
@@ -210,13 +245,17 @@ def evaluate_valid(model, dataset, args):
         rated = set(train[u])
         rated.add(0)
         item_idx = [valid[u][0]]
+        item_idx_itm = [items_info[valid[u][0]]]
         for _ in range(100):
             t = np.random.randint(1, itemnum + 1)
             while t in rated:
                 t = np.random.randint(1, itemnum + 1)
             item_idx.append(t)
+            item_idx_itm.append(items_info[t])
 
-        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]])
+        predictions = -model.predict(
+            *[np.array(l) for l in [[u], [seq], [seq_itm], item_idx, item_idx_itm]]
+        )
         predictions = predictions[0]
 
         rank = predictions.argsort().argsort()[0].item()
@@ -231,3 +270,5 @@ def evaluate_valid(model, dataset, args):
             sys.stdout.flush()
 
     return NDCG / valid_user, HT / valid_user
+
+ 
